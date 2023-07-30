@@ -1,3 +1,5 @@
+<div align="center">
+
 # TRSS-Yunzai Proxy Plugin
 
 TRSS-Yunzai 代理 适配器 插件
