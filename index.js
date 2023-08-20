@@ -5,6 +5,16 @@ import httpProxy from "express-http-proxy"
 import { WebSocket, WebSocketServer } from "ws"
 
 const adapter = new class ProxyAdapter {
+  constructor() {
+    this.blackWord = new RegExp(config.blackWord)
+    this.wsUrl = {}
+  }
+
+  makeLog(msg) {
+    if (msg.match(this.blackWord)) return
+    Bot.makeLog("info", msg)
+  }
+
   httpProxy(token) {
     const path = `/${token.shift()}`
 
@@ -19,37 +29,41 @@ const adapter = new class ProxyAdapter {
 
     const fnc = httpProxy(url, opts)
     Bot.express.use(path, (...args) => {
-      logger.info(`${logger.blue(`[${args[0].ip} => ${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${args[0].url} ${JSON.stringify(args[0].rawHeaders)}`)
+      logger.mark(`${logger.blue(`[${args[0].ip} => ${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${JSON.stringify(args[0].headers)}`)
       return fnc(...args)
     })
     logger.mark(`${logger.blue("[Proxy]")} ${path} => ${url}${token}`)
   }
 
   wsClose(conn) {
-    if (conn.isClosed) return
-    logger.mark(`${logger.blue(`[/${conn.path} <≠> ${conn.url}]`)} 断开连接`)
+    if (conn.closed) return
+    conn.closed = true
+    logger.mark(`${logger.blue(`[${conn.id} <≠> ${this.wsUrl[conn.path]}]`)} 断开连接`)
     conn.ws.close()
-    conn.wsp.close()
-    conn.isClosed = true
+    for (const i of conn.wsp) i.close()
   }
 
   wsConnect(conn) {
-    logger.mark(`${logger.blue(`[/${conn.path} <=> ${conn.url}]`)} 建立连接`)
-    conn.ws.on("error", error => { logger.error(error); this.wsClose(conn) })
+    conn.id = `${conn.req.connection.remoteAddress}-${conn.req.headers["sec-websocket-key"]}`
+    logger.mark(`${logger.blue(`[${conn.id} <=> ${this.wsUrl[conn.path]}]`)} 建立连接：${JSON.stringify(conn.req.headers)}`)
+    conn.wsp = []
+    conn.ws.on("error", error => this.wsClose(conn))
     conn.ws.on("close", () => this.wsClose(conn))
+    conn.ws.on("message", msg => {
+      const data = String(msg).trim()
+      this.makeLog(`${logger.blue(`[${conn.id} => ${this.wsUrl[conn.path]}]`)} 消息：${data}`)
+      for (const i of conn.wsp) i.send(data)
+    })
 
-    conn.wsp = new WebSocket(conn.url)
-    conn.wsp.onerror = error => { logger.error(error); this.wsClose(conn) }
-    conn.wsp.onclose = () => this.wsClose(conn)
-
-    conn.wsp.onopen = () => {
-      conn.ws.on("message", data => {
-        logger.info(`${logger.blue(`[/${conn.path} => ${conn.url}]`)} 消息：${data} `)
-        conn.wsp.send(data)
-      })
-      conn.wsp.onmessage = msg => {
-        logger.info(`${logger.blue(`[/${conn.path} <= ${conn.url}]`)} 消息：${msg.data}`)
-        conn.ws.send(msg.data)
+    for (const i of this.wsUrl[conn.path]) {
+      const wsp = new WebSocket(i, { headers: conn.req.headers })
+      wsp.onopen = () => conn.wsp.push(wsp)
+      wsp.onerror = error => { logger.error(error); this.wsClose(conn) }
+      wsp.onclose = () => this.wsClose(conn)
+      wsp.onmessage = msg => {
+        const data = String(msg.data).trim()
+        this.makeLog(`${logger.blue(`[${conn.id} <= ${i}]`)} 消息：${data}`)
+        conn.ws.send(data)
       }
     }
   }
@@ -57,10 +71,15 @@ const adapter = new class ProxyAdapter {
   wsProxy(token) {
     const path = token.shift()
     const url = `ws://${token.join(":")}`
-    if (!Bot.wss[path])
-      Bot.wss[path] = new WebSocketServer({ noServer: true })
-    Bot.wss[path].on("connection", ws => this.wsConnect({ path, url, ws }))
     logger.mark(`${logger.blue("[Proxy]")} /${path} => ${url}`)
+
+    if (Array.isArray(this.wsUrl[path]))
+      return this.wsUrl[path].push(url)
+    this.wsUrl[path] = [url]
+
+    if (!Array.isArray(Bot.wsf[path]))
+      Bot.wsf[path] = []
+    Bot.wsf[path].push((ws, req, ...args) => this.wsConnect({ path, url: this.wsUrl[path], ws, req, args }))
   }
 
   connect(token) {
@@ -79,7 +98,6 @@ const adapter = new class ProxyAdapter {
   load() {
     for (const token of config.token)
       adapter.connect(token)
-    return true
   }
 }
 
