@@ -12,7 +12,7 @@ const adapter = new class ProxyAdapter {
 
   makeLog(msg) {
     if (msg.match(this.blackWord)) return
-    Bot.makeLog("info", msg)
+    Bot.makeLog("debug", msg)
   }
 
   httpProxy(token) {
@@ -51,7 +51,6 @@ const adapter = new class ProxyAdapter {
     conn.ws.on("close", () => this.wsClose(conn))
     conn.ws.on("message", msg => {
       const data = String(msg).trim()
-      this.makeLog(`${logger.blue(`[${conn.id} => ${this.wsUrl[conn.path]}]`)} 消息：${data}`)
       for (const i of conn.wsp) i.send(data)
     })
 
@@ -62,7 +61,7 @@ const adapter = new class ProxyAdapter {
       wsp.onclose = () => this.wsClose(conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
-        this.makeLog(`${logger.blue(`[${conn.id} <= ${i}]`)} 消息：${data}`)
+        Bot.makeLog("debug", `${logger.blue(`[${conn.id} <= ${i}]`)} 消息：${data}`)
         conn.ws.send(data)
       }
     }
@@ -124,18 +123,18 @@ export class Proxy extends plugin {
     })
   }
 
-  async List() {
-    await this.reply(`共${config.token.length}个代理：\n${config.token.join("\n")}`, true)
+  List() {
+    this.reply(`共${config.token.length}个代理：\n${config.token.join("\n")}`, true)
   }
 
-  async Token() {
+  Token() {
     const token = this.e.msg.replace(/^#代理设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
-      await this.reply(`代理已删除，重启后生效，共${config.token.length}个代理`, true)
+      this.reply(`代理已删除，重启后生效，共${config.token.length}个代理`, true)
     } else {
       config.token.push(token)
-      await this.reply(`代理已设置，重启后生效，共${config.token.length}个代理`, true)
+      this.reply(`代理已设置，重启后生效，共${config.token.length}个代理`, true)
     }
     configSave(config)
   }
