@@ -1,10 +1,10 @@
-logger.info(logger.yellow("- 正在加载 代理 适配器插件"))
+logger.info(logger.yellow("- 正在加载 路由插件"))
 
 import { config, configSave } from "./Model/config.js"
 import httpProxy from "express-http-proxy"
 import { WebSocket, WebSocketServer } from "ws"
 
-const adapter = new class ProxyAdapter {
+const adapter = new class RouteAdapter {
   constructor() {
     this.blackWord = new RegExp(config.blackWord)
     this.wsUrl = {}
@@ -25,22 +25,22 @@ const adapter = new class ProxyAdapter {
       token = `/${token.join("/")}`
     else
       token = ""
-    const opts = { proxyReqPathResolver: req => `${token}${req.url}` }
+    const opts = { proxyReqPathResolver: req => `${token}${req.url.replace(/^\//, "")}` }
 
     const fnc = httpProxy(url, opts)
     Bot.express.use(path, (...args) => {
       logger.mark(`${logger.blue(`[${args[0].ip} => ${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${JSON.stringify(args[0].headers)}`)
       return fnc(...args)
     })
-    logger.mark(`${logger.blue("[Proxy]")} ${path} => ${url}${token}`)
+    logger.mark(`${logger.blue("[Route]")} ${path} => ${url}${token}`)
   }
 
   wsClose(conn) {
     if (conn.closed) return
     conn.closed = true
     logger.mark(`${logger.blue(`[${conn.id} <≠> ${this.wsUrl[conn.path]}]`)} 断开连接`)
-    conn.ws.close()
-    for (const i of conn.wsp) i.close()
+    conn.ws.terminate()
+    for (const i of conn.wsp) i.terminate()
   }
 
   wsConnect(conn) {
@@ -70,7 +70,7 @@ const adapter = new class ProxyAdapter {
   wsProxy(token) {
     const path = token.shift()
     const url = `ws://${token.join(":")}`
-    logger.mark(`${logger.blue("[Proxy]")} /${path} => ${url}`)
+    logger.mark(`${logger.blue("[Route]")} /${path} => ${url}`)
 
     if (Array.isArray(this.wsUrl[path]))
       return this.wsUrl[path].push(url)
@@ -102,20 +102,20 @@ const adapter = new class ProxyAdapter {
 
 Bot.adapter.push(adapter)
 
-export class Proxy extends plugin {
+export class RouteAdapter extends plugin {
   constructor() {
     super({
-      name: "ProxyAdapter",
-      dsc: "代理 适配器设置",
+      name: "RouteAdapter",
+      dsc: "路由设置",
       event: "message",
       rule: [
         {
-          reg: "^#代理列表$",
+          reg: "^#路由列表$",
           fnc: "List",
           permission: config.permission,
         },
         {
-          reg: "^#代理设置.+:.+:.+$",
+          reg: "^#路由设置.+:.+:.+$",
           fnc: "Token",
           permission: config.permission,
         }
@@ -124,20 +124,20 @@ export class Proxy extends plugin {
   }
 
   List() {
-    this.reply(`共${config.token.length}个代理：\n${config.token.join("\n")}`, true)
+    this.reply(`共${config.token.length}个路由：\n${config.token.join("\n")}`, true)
   }
 
   Token() {
-    const token = this.e.msg.replace(/^#代理设置/, "").trim()
+    const token = this.e.msg.replace(/^#路由设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
-      this.reply(`代理已删除，重启后生效，共${config.token.length}个代理`, true)
+      this.reply(`路由已删除，重启后生效，共${config.token.length}个路由`, true)
     } else {
       config.token.push(token)
-      this.reply(`代理已设置，重启后生效，共${config.token.length}个代理`, true)
+      this.reply(`路由已设置，重启后生效，共${config.token.length}个路由`, true)
     }
     configSave(config)
   }
 }
 
-logger.info(logger.green("- 代理 适配器插件 加载完成"))
+logger.info(logger.green("- 路由插件 加载完成"))

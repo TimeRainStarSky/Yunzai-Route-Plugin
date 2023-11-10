@@ -3,6 +3,6 @@
   "type": "module",
   "author": "TimeRainStarSky",
   "dependencies": {
-    "express-http-proxy": "^1.6.3"
+    "express-http-proxy": "^2.0.0"
   }
 }
