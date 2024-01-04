@@ -29,7 +29,7 @@ const adapter = new class RouteAdapter {
 
     const fnc = httpProxy(url, opts)
     Bot.express.use(path, (...args) => {
-      logger.mark(`${logger.blue(`[${args[0].ip} => ${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${JSON.stringify(args[0].headers)}`)
+      logger.mark(`${logger.blue(`[${args[0].ip} => http://${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${JSON.stringify(args[0].headers)}`)
       return fnc(...args)
     })
     logger.mark(`${logger.blue("[Route]")} ${path} => ${url}${token}`)
