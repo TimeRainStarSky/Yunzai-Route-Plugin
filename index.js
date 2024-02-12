@@ -1,8 +1,20 @@
 logger.info(logger.yellow("- 正在加载 路由插件"))
 
-import { config, configSave } from "./Model/config.js"
+import makeConfig from "../../lib/plugins/config.js"
 import httpProxy from "express-http-proxy"
 import { WebSocket, WebSocketServer } from "ws"
+
+const { config, configSave } = await makeConfig("Route", {
+  tips: "",
+  permission: "master",
+  blackWord: "^$",
+  token: [],
+}, {
+  tips: [
+    "欢迎使用 TRSS-Yunzai Route Plugin ! 作者：时雨🌌星空",
+    "参考：https://github.com/TimeRainStarSky/Yunzai-Route-Plugin",
+  ],
+})
 
 const adapter = new class RouteAdapter {
   constructor() {
@@ -127,7 +139,7 @@ export class RouteAdapter extends plugin {
     this.reply(`共${config.token.length}个路由：\n${config.token.join("\n")}`, true)
   }
 
-  Token() {
+  async Token() {
     const token = this.e.msg.replace(/^#路由设置/, "").trim()
     if (config.token.includes(token)) {
       config.token = config.token.filter(item => item != token)
@@ -136,7 +148,7 @@ export class RouteAdapter extends plugin {
       config.token.push(token)
       this.reply(`路由已设置，重启后生效，共${config.token.length}个路由`, true)
     }
-    configSave(config)
+    await configSave()
   }
 }
 
