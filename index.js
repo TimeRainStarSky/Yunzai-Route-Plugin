@@ -41,23 +41,23 @@ const adapter = new class RouteAdapter {
 
     const fnc = httpProxy(url, opts)
     Bot.express.use(path, (...args) => {
-      logger.mark(`${logger.blue(`[${args[0].ip} => http://${url}${opts.proxyReqPathResolver(args[0])}]`)} HTTP ${args[0].method} 请求：${JSON.stringify(args[0].headers)}`)
+      Bot.makeLog("mark", "", `${args[0].ip} => http://${url}${opts.proxyReqPathResolver(args[0])}`)
       return fnc(...args)
     })
-    logger.mark(`${logger.blue("[Route]")} ${path} => ${url}${token}`)
+    Bot.makeLog("mark", `${path} => ${url}${token}`, "Route")
   }
 
   wsClose(conn) {
     if (conn.closed) return
     conn.closed = true
-    logger.mark(`${logger.blue(`[${conn.id} <≠> ${this.wsUrl[conn.path]}]`)} 断开连接`)
+    Bot.makeLog("mark", "断开连接", `${conn.id} <≠> ${this.wsUrl[conn.path]}`)
     conn.ws.terminate()
     for (const i of conn.wsp) i.terminate()
   }
 
   wsConnect(conn) {
     conn.id = `${conn.req.connection.remoteAddress}-${conn.req.headers["sec-websocket-key"]}`
-    logger.mark(`${logger.blue(`[${conn.id} <=> ${this.wsUrl[conn.path]}]`)} 建立连接：${JSON.stringify(conn.req.headers)}`)
+    Bot.makeLog("mark", ["建立连接", conn.req.headers], `${conn.id} <=> ${this.wsUrl[conn.path]}`)
     conn.wsp = []
     conn.ws.on("error", error => this.wsClose(conn))
     conn.ws.on("close", () => this.wsClose(conn))
@@ -73,7 +73,7 @@ const adapter = new class RouteAdapter {
       wsp.onclose = () => this.wsClose(conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
-        Bot.makeLog("debug", `${logger.blue(`[${conn.id} <= ${i}]`)} 消息：${data}`)
+        Bot.makeLog("debug", ["消息", data], `${conn.id} <= ${i}`)
         conn.ws.send(data)
       }
     }
@@ -82,7 +82,7 @@ const adapter = new class RouteAdapter {
   wsProxy(token) {
     const path = token.shift()
     const url = `ws://${token.join(":")}`
-    logger.mark(`${logger.blue("[Route]")} /${path} => ${url}`)
+    Bot.makeLog("mark", `/${path} => ${url}`, "Route")
 
     if (Array.isArray(this.wsUrl[path]))
       return this.wsUrl[path].push(url)
