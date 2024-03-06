@@ -36,7 +36,7 @@ const adapter = new class RouteAdapter {
 
     const fnc = httpProxy(url, opts)
     Bot.express.use(path, (...args) => {
-      Bot.makeLog("info", "", `${args[0].ip} => http://${url}${opts.proxyReqPathResolver(args[0])}`)
+      Bot.makeLog("info", "", `${args[0].rid} => http://${url}${opts.proxyReqPathResolver(args[0])}`)
       return fnc(...args)
     })
     Bot.makeLog("mark", `${path} => ${url}${token}`, "Route")
@@ -45,14 +45,13 @@ const adapter = new class RouteAdapter {
   wsClose(conn) {
     if (conn.closed) return
     conn.closed = true
-    Bot.makeLog("info", "断开连接", `${conn.id} <≠> ${this.wsUrl[conn.path]}`)
+    Bot.makeLog("info", "断开连接", `${conn.ws.rid} <≠> ${this.wsUrl[conn.path]}`)
     conn.ws.terminate()
     for (const i of conn.wsp) i.terminate()
   }
 
   wsConnect(conn) {
-    conn.id = `${conn.req.connection.remoteAddress}-${conn.req.headers["sec-websocket-key"]}`
-    Bot.makeLog("info", ["建立连接", conn.req.headers], `${conn.id} <=> ${this.wsUrl[conn.path]}`)
+    Bot.makeLog("info", ["建立连接", conn.req.headers], `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`)
     conn.wsp = []
     conn.ws.on("error", error => this.wsClose(conn))
     conn.ws.on("close", () => this.wsClose(conn))
@@ -68,8 +67,8 @@ const adapter = new class RouteAdapter {
       wsp.onclose = () => this.wsClose(conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
-        if (!msg.match(this.blackWord))
-          Bot.makeLog("debug", ["消息", data], `${conn.id} <= ${i}`)
+        if (!data.match(this.blackWord))
+          Bot.makeLog("debug", ["消息", data], `${conn.ws.rid} <= ${i}`)
         conn.ws.send(data)
       }
     }
