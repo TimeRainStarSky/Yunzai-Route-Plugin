@@ -17,26 +17,34 @@ const { config, configSave } = await makeConfig("Route", {
 })
 
 const adapter = new class RouteAdapter {
-  constructor() {
-    this.blackWord = new RegExp(config.blackWord)
-    this.wsUrl = {}
-  }
+  id = "Route"
+  name = "Route"
+  version = "express-http-proxy v2.0.0"
+  blackWord = new RegExp(config.blackWord)
+  wsUrl = {}
 
   httpProxy(token) {
+    const opts = {}
     const path = `/${token.shift()}`
 
-    token = token.join(":").split("/")
-    const url = token.shift()
+    token = token.join(":")
+    opts.https = token.startsWith("https://")
+    token = token.replace(/^https?:\/\//, "").split("/")
+    let url = token.shift()
 
-    if (token.length)
-      token = `/${token.join("/")}`
-    else
-      token = ""
-    const opts = { proxyReqPathResolver: req => `${token}${req.url.replace(/^\//, "")}` }
+    if (token.length) {
+      token = token.join("/").split("?")
+      token = [`/${token.shift()}`, token.join("?")]
+    } else token = ["", ""]
+
+    opts.proxyReqPathResolver = token[1] ?
+      req => `${token[0]}${req.url.replace(/^\//, "")}${req.url.includes("?")?"&":"?"}${token[1]}` :
+      req => `${token[0]}${req.url.replace(/^\//, "")}`
 
     const fnc = httpProxy(url, opts)
+    url = `http${opts.https?"s":""}://${url}`
     Bot.express.use(path, (...args) => {
-      Bot.makeLog("info", "", `${args[0].rid} => http://${url}${opts.proxyReqPathResolver(args[0])}`)
+      Bot.makeLog("info", "", `${args[0].rid} => ${url}${opts.proxyReqPathResolver(args[0])}`)
       return fnc(...args)
     })
     Bot.makeLog("mark", `${path} => ${url}${token}`, "Route")
@@ -53,7 +61,10 @@ const adapter = new class RouteAdapter {
   wsConnect(conn) {
     Bot.makeLog("info", ["建立连接", conn.req.headers], `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`)
     conn.wsp = []
-    conn.ws.on("error", error => this.wsClose(conn))
+    conn.ws.on("error", error => {
+      Bot.makeLog("error", error, `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`)
+      this.wsClose(conn)
+    })
     conn.ws.on("close", () => this.wsClose(conn))
     conn.ws.on("message", msg => {
       const data = String(msg).trim()
@@ -63,7 +74,10 @@ const adapter = new class RouteAdapter {
     for (const i of this.wsUrl[conn.path]) {
       const wsp = new WebSocket(i, { headers: conn.req.headers })
       wsp.onopen = () => conn.wsp.push(wsp)
-      wsp.onerror = error => { logger.error(error); this.wsClose(conn) }
+      wsp.onerror = error => {
+        Bot.makeLog("error", error, `${conn.ws.rid} <=> ${i}`)
+        this.wsClose(conn)
+      }
       wsp.onclose = () => this.wsClose(conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
