@@ -47,7 +47,7 @@ const adapter = new class RouteAdapter {
       Bot.makeLog("info", "", `${args[0].rid} => ${url}${opts.proxyReqPathResolver(args[0])}`)
       return fnc(...args)
     })
-    Bot.makeLog("mark", `${path} => ${url}${token}`, "Route")
+    Bot.makeLog("mark", `${path} => ${url}${opts.proxyReqPathResolver({ url: "/" })}`, "Route")
   }
 
   wsClose(conn) {
@@ -151,7 +151,7 @@ export class RouteAdapter extends plugin {
   async Token() {
     const token = this.e.msg.replace(/^#路由设置/, "").trim()
     if (config.token.includes(token)) {
-      config.token = config.token.filter(item => item != token)
+      config.token = config.token.filter(item => item !== token)
       this.reply(`路由已删除，重启后生效，共${config.token.length}个路由`, true)
     } else {
       config.token.push(token)
