@@ -44,7 +44,7 @@ const adapter = new class RouteAdapter {
     const fnc = httpProxy(url, opts)
     url = `http${opts.https?"s":""}://${url}`
     Bot.express.use(path, (...args) => {
-      Bot.makeLog("info", "", `${args[0].rid} => ${url}${opts.proxyReqPathResolver(args[0])}`)
+      Bot.makeLog("info", "", `${args[0].rid} => ${url}${opts.proxyReqPathResolver(args[0])}`, true)
       return fnc(...args)
     })
     Bot.makeLog("mark", `${path} => ${url}${opts.proxyReqPathResolver({ url: "/" })}`, "Route")
@@ -53,16 +53,16 @@ const adapter = new class RouteAdapter {
   wsClose(conn) {
     if (conn.closed) return
     conn.closed = true
-    Bot.makeLog("info", "断开连接", `${conn.ws.rid} <≠> ${this.wsUrl[conn.path]}`)
+    Bot.makeLog("info", "断开连接", `${conn.ws.rid} <≠> ${this.wsUrl[conn.path]}`, true)
     conn.ws.terminate()
     for (const i of conn.wsp) i.terminate()
   }
 
   wsConnect(conn) {
-    Bot.makeLog("info", ["建立连接", conn.req.headers], `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`)
+    Bot.makeLog("info", ["建立连接", conn.req.headers], `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`, true)
     conn.wsp = []
     conn.ws.on("error", error => {
-      Bot.makeLog("error", error, `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`)
+      Bot.makeLog("error", error, `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`, true)
       this.wsClose(conn)
     })
     conn.ws.on("close", () => this.wsClose(conn))
@@ -75,14 +75,14 @@ const adapter = new class RouteAdapter {
       const wsp = new WebSocket(i, { headers: conn.req.headers })
       wsp.onopen = () => conn.wsp.push(wsp)
       wsp.onerror = error => {
-        Bot.makeLog("error", error, `${conn.ws.rid} <=> ${i}`)
+        Bot.makeLog("error", error, `${conn.ws.rid} <=> ${i}`, true)
         this.wsClose(conn)
       }
       wsp.onclose = () => this.wsClose(conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
         if (!data.match(this.blackWord))
-          Bot.makeLog("debug", ["消息", data], `${conn.ws.rid} <= ${i}`)
+          Bot.makeLog("debug", ["消息", data], `${conn.ws.rid} <= ${i}`, true)
         conn.ws.send(data)
       }
     }
