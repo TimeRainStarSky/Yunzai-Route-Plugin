@@ -65,7 +65,7 @@ const adapter = new class RouteAdapter {
       Bot.makeLog("error", error, `${conn.ws.rid} <=> ${this.wsUrl[conn.path]}`, true)
       this.wsClose(conn)
     })
-    conn.ws.on("close", () => this.wsClose(conn))
+    conn.ws.on("close", this.wsClose.bind(this, conn))
     conn.ws.on("message", msg => {
       const data = String(msg).trim()
       for (const i of conn.wsp) i.send(data)
@@ -78,10 +78,10 @@ const adapter = new class RouteAdapter {
         Bot.makeLog("error", error, `${conn.ws.rid} <=> ${i}`, true)
         this.wsClose(conn)
       }
-      wsp.onclose = () => this.wsClose(conn)
+      wsp.onclose = this.wsClose.bind(this, conn)
       wsp.onmessage = msg => {
         const data = String(msg.data).trim()
-        if (!data.match(this.blackWord))
+        if (!this.blackWord.test(data))
           Bot.makeLog("debug", ["消息", data], `${conn.ws.rid} <= ${i}`, true)
         conn.ws.send(data)
       }
@@ -90,7 +90,9 @@ const adapter = new class RouteAdapter {
 
   wsProxy(token) {
     const path = token.shift()
-    const url = `ws://${token.join(":")}`
+    let url = token.join(":")
+    if (!/^wss?:\/\//.test(url))
+      url = `ws://${url}`
     Bot.makeLog("mark", `/${path} => ${url}`, "Route")
 
     if (Array.isArray(this.wsUrl[path]))
